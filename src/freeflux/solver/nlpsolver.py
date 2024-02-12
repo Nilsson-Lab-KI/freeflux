@@ -59,24 +59,24 @@ class MFAModel:
         self.N = self.model.null_space
         self.T = self.model.transform_matrix
 
-        self.ntotalfluxes = len(self.model.totalfluxids)
+        self.n_total_fluxes = len(self.model.totalfluxids)
 
     def _calculate_difference_sim_exp_MDVs(self):
 
         simMDVs = self.calculator._calculate_MDVs()
         expMDVs = self.model.measured_MDVs
-        diff = np.concatenate([simMDVs[emuid] - expMDVs[emuid][0]
-                               for emuid in self.model.target_EMUs])
-
-        return diff
+        return np.concatenate(
+            [
+                simMDVs[emu_id] - expMDVs[emu_id][0]
+                for emu_id in self.model.target_EMUs
+            ]
+        )
 
     def _calculate_difference_sim_exp_fluxes(self):
 
         simFluxes = self.model.total_fluxes[self.model.measured_fluxes.keys()]
         expFluxes = np.array([mean for mean, _ in self.model.measured_fluxes.values()])
-        diff = simFluxes - expFluxes
-
-        return diff
+        return simFluxes - expFluxes
 
     def _calculate_sim_MDVs_derivative(self):
 
@@ -84,16 +84,11 @@ class MFAModel:
         expMDVs = self.model.measured_MDVs
         diff = np.concatenate([simMDVs[emuid] - expMDVs[emuid][0]
                                for emuid in self.model.target_EMUs])
-
         dxsim_dp = np.vstack([simMDVsDer[emuid] for emuid in self.model.target_EMUs])
-
         return diff, dxsim_dp
 
     def _calculate_sim_fluxes_derivative(self):
-
-        dvsim_dp = self.model.measured_fluxes_der_p
-
-        return dvsim_dp
+        return self.model.measured_fluxes_der_p
 
     def build_objective(self):
 
@@ -177,7 +172,7 @@ class MFAModel:
         A2 = self.T @ self.N
         A3 = -A2
 
-        b1 = np.zeros(self.ntotalfluxes)
+        b1 = np.zeros(self.n_total_fluxes)
         vnet_lb, vnet_ub = np.array(list(self.model.net_fluxes_range.values())).T
         b2 = vnet_lb
         b3 = -vnet_ub
@@ -204,7 +199,7 @@ class MFAModel:
             vnet_ini = np.random.uniform(low=vnet_lb, high=vnet_ub)
         else:
             vnet_ini = ini_netfluxes
-
+        # initial free flux vector
         u_ini = pinv2(self.T @ self.N) @ vnet_ini
 
         self.x0 = u_ini
@@ -375,14 +370,16 @@ class InstMFAModel(MFAModel):
 
         simMDVs, simMDVsDer = self.calculator._calculate_inst_MDVs_and_derivatives_p()
         expMDVs = self.model.measured_inst_MDVs
-        diff = np.concatenate([simMDVs[emuid][t] - expMDVs[emuid][t][0]
-                               for emuid in self.model.target_EMUs
-                               for t in expMDVs[emuid] if t != 0])
-
+        diff = np.concatenate(
+            [
+                simMDVs[emuid][t] - expMDVs[emuid][t][0]
+               for emuid in self.model.target_EMUs
+               for t in expMDVs[emuid] if t != 0
+            ]
+        )
         dxsim_dp = np.vstack([simMDVsDer[emuid][t]
                               for emuid in self.model.target_EMUs
                               for t in expMDVs[emuid] if t != 0])
-
         return diff, dxsim_dp
 
     def build_objective(self):
@@ -475,18 +472,18 @@ class InstMFAModel(MFAModel):
         A3 = -A2
         A4 = np.eye(self.nconcs)
 
-        b1 = np.zeros(self.ntotalfluxes)
+        b1 = np.zeros(self.n_total_fluxes)
         vnet_lb, vnet_ub = np.array(list(self.model.net_fluxes_range.values())).T
         b2 = vnet_lb
         b3 = -vnet_ub
         b4 = np.zeros(self.nconcs)
 
         A = np.zeros(
-            (self.ntotalfluxes + 2 * self.nnetfluxes + self.nconcs,
+            (self.n_total_fluxes + 2 * self.nnetfluxes + self.nconcs,
              self.nfreefluxes + self.nconcs)
         )
-        A[:(self.ntotalfluxes + 2 * self.nnetfluxes), :self.nfreefluxes] = np.vstack((A1, A2, A3))
-        A[(self.ntotalfluxes + 2 * self.nnetfluxes):, self.nfreefluxes:] = A4
+        A[:(self.n_total_fluxes + 2 * self.nnetfluxes), :self.nfreefluxes] = np.vstack((A1, A2, A3))
+        A[(self.n_total_fluxes + 2 * self.nnetfluxes):, self.nfreefluxes:] = A4
         b = np.concatenate((b1, b2, b3, b4))
 
         if self.solver == 'slsqp':

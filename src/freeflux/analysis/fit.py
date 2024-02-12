@@ -206,13 +206,13 @@ class Fitter(Optimizer, Simulator):
                 self.model.unbalanced_metabolites.remove(metabid)
             
     
-    def set_flux_bounds(self, fluxid, bounds):
+    def set_flux_bounds(self, flux_id, bounds):
         '''
         Set lower and upper bounds of flux.
         
         Parameters
         ----------
-        fluxid: str or 'all'
+        flux_id: str or 'all'
             Flux ID, i.e., reaction ID. Since forward and backward fluxes of 
             reversible reaction are usually unknown, the method is used to set 
             the range of net fluxes.
@@ -229,15 +229,15 @@ class Fitter(Optimizer, Simulator):
         
         fluxids = []
         if bounds[0] < bounds[1]:   # lower bound not allow to equal upper bound
-            if fluxid == 'all':
+            if flux_id == 'all':
                 for rxnid in self.model.reactions:
                     self._set_flux_bounds(rxnid, bounds)
                     fluxids.append(rxnid)    
-            elif fluxid in self.model.reactions:
-                self._set_flux_bounds(fluxid, bounds)
-                fluxids = [fluxid]
+            elif flux_id in self.model.reactions:
+                self._set_flux_bounds(flux_id, bounds)
+                fluxids = [flux_id]
             else:
-                raise ValueError(f'flux range set to nonexistent reaction {fluxid}')
+                raise ValueError(f'flux range set to nonexistent reaction {flux_id}')
         else:
             raise ValueError(
                 'lower bound of flux should be less than upper bound, '
@@ -391,13 +391,11 @@ class Fitter(Optimizer, Simulator):
         if self.contexts:
             context = self.contexts[-1]
             context.add_undo(self._unset_measured_fluxes_inversed_covariance_matrix)
-    
-            
+
     def _unset_measured_fluxes_inversed_covariance_matrix(self):
         
         self.model.measured_fluxes_inv_cov = None
-        
-    
+
     def _calculate_measured_fluxes_derivative_p(self, kind):
         '''
         Parameters

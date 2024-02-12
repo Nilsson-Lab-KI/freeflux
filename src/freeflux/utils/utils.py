@@ -196,7 +196,7 @@ class Calculator():
         
         return measured_fluxes_der
         
-        
+    # this returns a zero matrix
     def _calculate_measured_fluxes_derivative_c(self):
         
         nmeasfluxes = len(self.model.measured_fluxes)
