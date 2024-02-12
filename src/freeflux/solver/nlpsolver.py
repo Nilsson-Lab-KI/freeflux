@@ -14,6 +14,7 @@ except ModuleNotFoundError:
     OPENOPT_INSTALLED = False
 else:
     OPENOPT_INSTALLED = True
+
 from ..utils.utils import Calculator
 
 
@@ -30,7 +31,14 @@ class MFAModel:
         * If "ralg", openopt NLP solver will be used.
     """
 
-    def __init__(self, model, fit_measured_fluxes, solver='slsqp'):
+    # cannot type annotate due to cyclic import
+    # model: Model
+    calculator: Calculator
+    fit_measured_fluxes: bool
+    solver: str
+    n_total_fluxes: int
+
+    def __init__(self, model, fit_measured_fluxes: bool, solver='slsqp'):
         """
         Parameters
         ----------
