@@ -9,7 +9,6 @@ from ..solver.lpsolver import FBAModel
 from ..io.results import FBAResults, FVAResults
 from ..utils.progress import Progress
 from ..utils.context import Context
-from ..core.model import Model
 
 
 class Optimizer:
@@ -20,9 +19,10 @@ class Optimizer:
         Freeflux Model.
     """
 
-    model: Model
+    # can't type annotate this due to mutual dependency, gives cyclic import
+    # model: Model
 
-    def __init__(self, model: Model):
+    def __init__(self, model):
         """
         Parameters
         ----------
