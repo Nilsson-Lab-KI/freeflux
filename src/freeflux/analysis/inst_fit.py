@@ -101,6 +101,9 @@ class InstFitter(Fitter, InstSimulator):
                 if not self.model.measured_inst_MDVs[fragmentid]:
                     self.model.measured_inst_MDVs.pop(fragmentid)
 
+    def set_measured_concentration(self, met_id: str, mean: float, sd: float):
+        self.model.measured_concentrations[met_id] = [mean, sd]
+
     def set_concentration_bounds(self, metabid, bounds):
         """
         Set lower and upper bounds for concentration in unit of umol/gCDW.
@@ -263,6 +266,11 @@ class InstFitter(Fitter, InstSimulator):
 
         self.model.initial_matrix_Ys_der_p.clear()
 
+    def _set_measured_conc_sd(self):
+        self.model.measured_conc_sd = np.array(
+            [sd for _, sd in self.model.measured_concentrations.values()]
+        )
+
     def _estimate_concentrations_range(self):
 
         if not self.model.concentrations_range:
@@ -311,6 +319,7 @@ class InstFitter(Fitter, InstSimulator):
         self._calculate_substrate_MDV_derivatives_p('inst', dilution_from)
         self._calculate_measured_inst_MDVs_inversed_covariance_matrix()
         self._calculate_measured_fluxes_inversed_covariance_matrix()
+        self._set_measured_conc_sd()
         self._calculate_measured_fluxes_derivative_p('inst')
         self._calculate_initial_matrix_Xs()
         self._calculate_initial_matrix_Ys()

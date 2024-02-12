@@ -360,11 +360,18 @@ class InstMFAModel(MFAModel):
 
         simMDVs = self.calculator._calculate_inst_MDVs()
         expMDVs = self.model.measured_inst_MDVs
-        diff = np.concatenate([simMDVs[emuid][t] - expMDVs[emuid][t][0]
-                               for emuid in self.model.target_EMUs
-                               for t in expMDVs[emuid] if t != 0])
+        return np.concatenate(
+            [
+                simMDVs[emuid][t] - expMDVs[emuid][t][0]
+                for emuid in self.model.target_EMUs
+                for t in expMDVs[emuid] if t != 0
+            ]
+        )
 
-        return diff
+    def _calculate_diff_sim_exp_conc(self):
+        sim_conc = self.model.concentrations[self.model.measured_concentrations.keys()]
+        conc_mean = np.array([mean for mean, _ in self.model.measured_concentrations.values()])
+        return sim_conc - conc_mean
 
     def _calculate_sim_MDVs_derivative(self):
 
@@ -384,60 +391,74 @@ class InstMFAModel(MFAModel):
 
     def build_objective(self):
 
-        def _f(p):
+        def update_model(p):
+            # update the model state from the current point p
             u, c = p[:self.nfreefluxes], p[self.nfreefluxes:]
             self.model.total_fluxes[:] = self.N @ u
             self.model.concentrations[:] = c
 
+        def mdv_squared_error():
             MDV_diff = self._calculate_difference_sim_exp_MDVs()
             MDV_inv_cov = self.model.measured_inst_MDVs_inv_cov
+            return MDV_diff @ MDV_inv_cov @ MDV_diff
 
-            obj = MDV_diff @ MDV_inv_cov @ MDV_diff
-
-            return obj
-
-        def f1(p):
-            return _f(p)
-
-        def f2(p):
-            obj1 = _f(p)
-
+        def flux_squared_error():
             flux_diff = self._calculate_difference_sim_exp_fluxes()
             flux_inv_cov = self.model.measured_fluxes_inv_cov
-            obj2 = flux_diff @ flux_inv_cov @ flux_diff
+            return flux_diff @ flux_inv_cov @ flux_diff
 
-            return obj1 + obj2
+        def conc_squared_error():
+            conc_diff = self._calculate_diff_sim_exp_conc()
+            conc_sd = self.model.measured_conc_sd
+            return np.sum(conc_diff**2 / conc_sd**2)
 
-        self.f = f2 if self.fit_measured_fluxes else f1
+        def mdv_objective(p):
+            update_model(p)
+            return mdv_squared_error() + conc_squared_error()
+
+        def mdv_flux_objective(p):
+            update_model(p)
+            return mdv_squared_error() + conc_squared_error() + flux_squared_error()
+
+        self.f = mdv_flux_objective if self.fit_measured_fluxes else mdv_objective
 
     def build_gradient(self):
 
-        def _df(p):
+        def update_model(p):
             u, c = p[:self.nfreefluxes], p[self.nfreefluxes:]
             self.model.total_fluxes[:] = self.N @ u
             self.model.concentrations[:] = c
 
+        def mdv_gradient():
             MDV_diff, MDV_der = self._calculate_sim_MDVs_derivative()
             MDV_inv_cov = self.model.measured_inst_MDVs_inv_cov
-            grad = MDV_der.T @ MDV_inv_cov @ MDV_diff
+            return MDV_der.T @ MDV_inv_cov @ MDV_diff
 
-            return grad
+        def flux_gradient():
+            # with n measured fluxes and p parameters:
+            flux_der = self._calculate_sim_fluxes_derivative()          # n x p
+            flux_diff = self._calculate_difference_sim_exp_fluxes()     # n x n
+            flux_inv_cov = self.model.measured_fluxes_inv_cov           # n x n
+            return flux_der.T @ flux_inv_cov @ flux_diff                # p x n
 
-        def df1(p):
-            return _df(p)
+        def conc_gradient():
+            conc_diff = self._calculate_diff_sim_exp_conc()
+            conc_sd = self.model.measured_conc_sd
+            conc_gradient_p = conc_diff / (conc_sd ** 2)
+            # gradint w.r.t u is zero
+            return np.concatenate([np.zeros(self.nfreefluxes), conc_gradient_p])
 
-        def df2(p):
-            grad1 = _df(p)
+        def mdv_df(p):
+            update_model(p)
+            return mdv_gradient() + conc_gradient()
 
-            flux_der = self._calculate_sim_fluxes_derivative()
-            flux_diff = self._calculate_difference_sim_exp_fluxes()
-            flux_inv_cov = self.model.measured_fluxes_inv_cov
-            grad2 = flux_der.T @ flux_inv_cov @ flux_diff
+        def mdv_flux_df(p):
+            update_model(p)
+            return mdv_gradient()+ conc_gradient() + flux_gradient()
 
-            return grad1 + grad2
+        self.df = mdv_flux_df if self.fit_measured_fluxes else mdv_df
 
-        self.df = df2 if self.fit_measured_fluxes else df1
-
+    # NOTE: the hessian is not used by either optimizer
     def build_hessian(self):
 
         def _ddf(p):

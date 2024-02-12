@@ -193,6 +193,9 @@ class Model:
         self.measured_fluxes_inv_cov = None
         self.measured_fluxes_der_p = None
         self.unbalanced_metabolites = set()
+
+        self.measured_concentrations = {}
+        self.measured_conc_sd = None
         
         self.net_fluxes_bounds = {}
         self.net_fluxes_range = OrderedDict()
